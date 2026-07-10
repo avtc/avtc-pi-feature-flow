@@ -24,7 +24,6 @@
     "jscpd"
   ],
   "ignoreDependencies": [
-    "better-sqlite3",
     "avtc-pi-settings-ui",
     "avtc-pi-logger",
     "avtc-pi-ui-components",

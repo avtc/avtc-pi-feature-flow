@@ -3,9 +3,59 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import Database, { type Database as BetterSqlite3Database } from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { MIGRATIONS } from "./kanban-db-schema.js";
 import type { Feature, FeatureHistoryEntry, Lane, Project } from "./kanban-types.js";
+
+/**
+ * Loose statement interface matching the call shape used throughout this module
+ * (positional params spread as `unknown[]`, row reads cast via `as`). node:sqlite's
+ * `StatementSync` types params as `SQLInputValue` and rows as `Record<string,
+ * SQLOutputValue>`, which reject the existing `as Feature` casts. This interface
+ * widens the param/row types to `unknown` so all existing casts stay valid, while
+ * preserving `.run()`'s `changes` count for affected callers.
+ */
+interface SqlStatement {
+  run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint };
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+}
+
+/**
+ * Loose database interface (see {@link SqlStatement}). `DatabaseSync` is
+ * assignable to this because `SQLInputValue` ⊆ `unknown` and the concrete return
+ * types are subtypes of `unknown`. Keeps the migration a drop-in: every
+ * `.prepare().get() as Feature` and `.run(...mixedParams)` call compiles unchanged.
+ */
+interface SqlDatabase {
+  exec(sql: string): void;
+  prepare(sql: string): SqlStatement;
+  close(): void;
+}
+
+/**
+ * Suppress Node's ExperimentalWarning for `node:sqlite`. The API is stable in
+ * practice (ships with Node 22+, required by pi) but Node still tags it
+ * experimental. Without this, every process logs a warning on first DB open.
+ * Pattern mirrors avtc-pi-portrait and gsd-pi.
+ */
+const _origEmit = process.emit;
+// Node's overloaded emit signature isn't directly assignable — loose cast is intentional.
+(process as { emit: typeof process.emit }).emit = function (event: string, ...args: unknown[]): boolean {
+  if (
+    event === "warning" &&
+    args[0] &&
+    typeof args[0] === "object" &&
+    "name" in args[0] &&
+    (args[0] as { name: string }).name === "ExperimentalWarning" &&
+    "message" in args[0] &&
+    typeof (args[0] as { message: string }).message === "string" &&
+    (args[0] as { message: string }).message.includes("SQLite")
+  ) {
+    return false;
+  }
+  return _origEmit.apply(process, [event, ...args] as Parameters<typeof process.emit>);
+};
 
 /** Sentinel: empty params array for rawExec */
 export const EMPTY_PARAMS: unknown[] = [];
@@ -78,28 +128,28 @@ export function normalizeRepoPath(repoPath: string): string {
 }
 
 export class KanbanDatabase {
-  private db!: BetterSqlite3Database;
+  private db!: SqlDatabase;
 
   private constructor(_dbPath: string) {}
 
   /**
    * Create a new KanbanDatabase backed by a SQLite file.
-   * Kept async for API compatibility but internally synchronous (better-sqlite3).
+   * Kept async for API compatibility but internally synchronous (node:sqlite DatabaseSync).
    */
   static async create(dataDir: string): Promise<KanbanDatabase> {
     fs.mkdirSync(dataDir, { recursive: true });
     const dbPath = path.join(dataDir, DB_FILENAME);
 
-    const db = new Database(dbPath);
+    const db = new DatabaseSync(dbPath);
 
     // Enable WAL mode for safe concurrent multi-process access
-    db.pragma("journal_mode = WAL");
+    db.exec("PRAGMA journal_mode = WAL");
     // Wait up to 5s for locked database instead of failing immediately
-    db.pragma("busy_timeout = 5000");
+    db.exec("PRAGMA busy_timeout = 5000");
     // NORMAL is safe with WAL and much faster than FULL
-    db.pragma("synchronous = NORMAL");
+    db.exec("PRAGMA synchronous = NORMAL");
     // Enable foreign key enforcement (required for ON DELETE CASCADE)
-    db.pragma("foreign_keys = ON");
+    db.exec("PRAGMA foreign_keys = ON");
 
     const instance = new KanbanDatabase(dbPath);
     instance.db = db;
@@ -108,7 +158,7 @@ export class KanbanDatabase {
   }
 
   /** @internal Bind an already-initialized Database (for testing) */
-  static fromDb(db: BetterSqlite3Database, dbPath: string): KanbanDatabase {
+  static fromDb(db: DatabaseSync, dbPath: string): KanbanDatabase {
     const instance = new KanbanDatabase(dbPath);
     instance.db = db;
     instance.runMigrations();
@@ -117,8 +167,8 @@ export class KanbanDatabase {
 
   /** @internal Create an in-memory database for testing (no file I/O) */
   static async createInMemory(): Promise<KanbanDatabase> {
-    const db = new Database(":memory:");
-    db.pragma("foreign_keys = ON");
+    const db = new DatabaseSync(":memory:");
+    db.exec("PRAGMA foreign_keys = ON");
     return KanbanDatabase.fromDb(db, ":memory:");
   }
 
@@ -168,21 +218,20 @@ export class KanbanDatabase {
       }
 
       // Execute migration as a batch, then record version in same transaction.
-      const tx = this.db.transaction((m: { version: number; sql: string }) => {
-        this.db.exec(m.sql);
+      this.withTransaction(() => {
+        this.db.exec(migration.sql);
         this.db
           .prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)")
-          .run(m.version, new Date().toISOString());
+          .run(migration.version, new Date().toISOString());
       });
-      tx(migration);
     }
   }
 
   // ---- Persistence ----
 
-  /** No-op for better-sqlite3 — writes are immediate via WAL. Kept for API compat. */
+  /** No-op for node:sqlite — writes are immediate via WAL. Kept for API compat. */
   save(): void {
-    // better-sqlite3 writes are synchronous and immediate via WAL.
+    // node:sqlite writes are synchronous and immediate via WAL.
     // This method is kept as a no-op for backward compatibility with callers.
   }
 
@@ -192,15 +241,52 @@ export class KanbanDatabase {
 
   // ---- Raw query helpers ----
 
-  /** Run a function inside a transaction. better-sqlite3 handles BEGIN/COMMIT internally. */
+  /** Run a function inside a transaction. Uses SAVEPOINT for nesting so it
+   *  composes safely when called from within another transaction. */
   runInTransaction<T>(fn: () => T): T {
-    return this.db.transaction(fn)();
+    return this.withTransaction(fn);
+  }
+
+  /**
+   * Transaction wrapper replacing better-sqlite3's `.transaction()`.
+   * Uses SAVEPOINT for re-entrant nesting (matches better-sqlite3 semantics):
+   * the outermost call opens BEGIN/COMMIT, nested calls open SAVEPOINT tiers.
+   * On error the active tier is rolled back and the error re-thrown.
+   */
+  private transactionDepth = 0;
+  private withTransaction<T>(fn: () => T): T {
+    const topLevel = this.transactionDepth === 0;
+    if (topLevel) {
+      this.db.exec("BEGIN");
+    } else {
+      this.db.exec(`SAVEPOINT t${this.transactionDepth}`);
+    }
+    this.transactionDepth++;
+    try {
+      const result = fn();
+      if (topLevel) {
+        this.db.exec("COMMIT");
+      } else {
+        this.db.exec(`RELEASE SAVEPOINT t${this.transactionDepth - 1}`);
+      }
+      return result;
+    } catch (err) {
+      if (topLevel) {
+        this.db.exec("ROLLBACK");
+      } else {
+        this.db.exec(`ROLLBACK TO SAVEPOINT t${this.transactionDepth - 1}`);
+        this.db.exec(`RELEASE SAVEPOINT t${this.transactionDepth - 1}`);
+      }
+      throw err;
+    } finally {
+      this.transactionDepth--;
+    }
   }
 
   rawExec(sql: string, params: unknown[]): Record<string, unknown>[] {
     const stmt = this.db.prepare(sql);
     // Use run() for non-SELECT statements (INSERT, UPDATE, DELETE, etc.)
-    // better-sqlite3 throws on .all() for non-returning statements
+    // node:sqlite throws on .all() for non-returning statements
     const trimmed = sql.trimStart().toUpperCase();
     if (
       trimmed.startsWith("INSERT") ||
@@ -347,15 +433,15 @@ export class KanbanDatabase {
   }
 
   /** Update only the priority of a feature using a cached prepared statement. */
-  private _updatePriorityStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _priorityBoundsStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _moveUpdateStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _moveHistoryStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _heartbeatStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _getFeatureStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _findFeatureBySlugStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _findFeatureBySlugAndProjectStmt: Database.Statement<unknown[], unknown> | null = null;
-  private _availableFeaturesCache = new Map<string, Database.Statement<unknown[], unknown>>();
+  private _updatePriorityStmt: SqlStatement | null = null;
+  private _priorityBoundsStmt: SqlStatement | null = null;
+  private _moveUpdateStmt: SqlStatement | null = null;
+  private _moveHistoryStmt: SqlStatement | null = null;
+  private _heartbeatStmt: SqlStatement | null = null;
+  private _getFeatureStmt: SqlStatement | null = null;
+  private _findFeatureBySlugStmt: SqlStatement | null = null;
+  private _findFeatureBySlugAndProjectStmt: SqlStatement | null = null;
+  private _availableFeaturesCache = new Map<string, SqlStatement>();
   updateFeaturePriority(featureId: number, priority: number, now: string | undefined): void {
     if (!this._updatePriorityStmt) {
       this._updatePriorityStmt = this.db.prepare("UPDATE features SET priority = ?, updated_at = ? WHERE id = ?");
@@ -565,7 +651,7 @@ export class KanbanDatabase {
   /** Delete a feature and cascade its related data.
    *  @returns true if the feature was deleted or didn't exist, false if locked. */
   deleteFeature(featureId: number): boolean {
-    return this.db.transaction(() => {
+    return this.withTransaction(() => {
       // Check if feature is locked — refuse deletion if locked
       const lock = this.db.prepare("SELECT 1 FROM feature_locks WHERE feature_id = ?").get(featureId);
       if (lock) return false;
@@ -584,7 +670,7 @@ export class KanbanDatabase {
         .run(featureId, featureId);
       this.db.prepare("DELETE FROM features WHERE id = ?").run(featureId);
       return true;
-    })();
+    });
   }
 
   // ---- Dependencies ----

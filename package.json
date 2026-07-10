@@ -1,7 +1,7 @@
 {
   "name": "avtc-pi-feature-flow",
-  "version": "1.0.1",
-  "description": "Structured feature-development workflow for pi: design -> plan -> implement -> verify -> review with kanban auto-agents",
+  "version": "1.0.3",
+  "description": "Predictable, deterministic feature development for pi — deep upfront design, configurable comprehensive review and verification rigor, and auto-agents draining a backlog",
   "type": "module",
   "keywords": [
     "pi-package",
@@ -69,7 +69,6 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
     "avtc-pi-logger": "^1.0.0",
     "avtc-pi-settings-ui": "^1.0.0",
     "avtc-pi-ui-components": "^1.0.0",
@@ -82,5 +81,13 @@
   "bugs": {
     "url": "https://github.com/avtc/avtc-pi-feature-flow/issues"
   },
-  "homepage": "https://github.com/avtc/avtc-pi-feature-flow"
+  "homepage": "https://github.com/avtc/avtc-pi-feature-flow",
+  "bundledDependencies": [
+    "avtc-pi-subagent",
+    "avtc-pi-todo",
+    "avtc-pi-parallel-work-guardrail",
+    "avtc-pi-ui-components",
+    "avtc-pi-subagent-ui-bridge",
+    "avtc-pi-unstuck"
+  ]
 }

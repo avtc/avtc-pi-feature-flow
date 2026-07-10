@@ -1,49 +1,45 @@
 # avtc-pi-feature-flow
 
-A structured, phase-gated feature-development harness for [pi](https://pi.dev) — drives each feature through a disciplined workflow pipeline, tracks features on a kanban board, and can run auto-agents that pick up queued features and move them through to completion with minimal supervision.
+Predictable, deterministic feature development for [pi](https://pi.dev) — deep upfront design, configurable comprehensive review and verification rigor, and auto-agents draining a backlog
 
-## What it does
+## Features
 
-Feature-flow wraps pi in a disciplined development cycle and adds the orchestration to manage many features in parallel:
+Feature-flow makes agentic development predictable and deterministic:
 
-- **A workflow pipeline** the agent walks through for each feature — design → plan → implement → verify → review → (UAT) → finish.
-- **A kanban board** (browser UI) tracking features across lanes — backlog, design, design-approval, ready, in-progress, UAT, done — with locks so multiple agents don't collide on the same feature.
-- **Auto-agents** that autonomously pull the next feature off the board and drive it through the pipeline, so a backlog can drain with light oversight instead of one-feature-at-a-time hand-holding.
-- **Per-feature git worktrees** so each feature gets an isolated branch workspace; parallel agents never step on each other's working tree.
-- **Specialized review/verification subagents** dispatched in parallel during the review and verify phases.
+- **Deep upfront design** — subagents research every nuance during design; all open questions are asked upfront and answers are stored in the design-doc for later stages to build on.
+- **Configurable review and verification** — set iteration counts per phase (design, plan, code review, verification) and per task; turn them down for simple features, up for complex ones.
+- **Two review modes** — one general-reviewer subagent, or multiple specialized subagents (guidelines, quality, security, performance, requirements, testing) dispatched in parallel.
+- **Multi-model routing** — assign different models per stage and per agent name (with glob patterns); optional round-robin rotation diversifies review findings.
+- **Todo-driven checklists** — reviews and verification run against checklist-driven todo items so nothing is skipped or deferred.
+- **Automatic context compaction** — configurable compaction triggers between tasks, phases, and review iterations keep long features viable without losing context.
+- **Auto-agents** — once designs are approved, an auto-agent (started in a separate terminal) works through them sequentially: plan, implement, review each.
+- **Kanban board** — browser UI tracking features across lanes with locks; auto-agents pull the next approved design off the board.
+- **Per-feature git worktrees** — each feature gets an isolated branch workspace so parallel agents never collide.
 
 ## Requirements
 
-Feature-flow coordinates with the rest of the avtc-pi suite at runtime. Install these alongside it:
+**Git** must be installed separately — needed for per-feature worktrees, review diffs, and TDD guardrails.
 
-**Required:**
-- **Git** — required at runtime; without it, per-feature worktrees aren't created, review can't diff changes against the initial state, and TDD guardrails are skipped.
-- **[`avtc-pi-subagent`](https://github.com/avtc/avtc-pi-subagent)** — dispatches the review/verify/research subagents
-- **[`avtc-pi-todo`](https://github.com/avtc/avtc-pi-todo)** — the working-memory todo list (tracks implementation + review-fix work)
-- **[`avtc-pi-parallel-work-guardrail`](https://github.com/avtc/avtc-pi-parallel-work-guardrail)** — protects parallel worktree work from disruptive git operations
-- **[`avtc-pi-settings-ui`](https://github.com/avtc/avtc-pi-settings-ui)** — settings UI (compile-time dependency)
+Installing via `pi install npm:avtc-pi-feature-flow` bundles these extensions automatically:
+
+- **[`avtc-pi-subagent`](https://github.com/avtc/avtc-pi-subagent)** — a subagent tool supporting context compaction and nested subagents
+- **[`avtc-pi-todo`](https://github.com/avtc/avtc-pi-todo)** — a working-memory plan the agent manages through multi-stage work
+- **[`avtc-pi-parallel-work-guardrail`](https://github.com/avtc/avtc-pi-parallel-work-guardrail)** — block or approve agent git operations that disrupt parallel work
+- **[`avtc-pi-ui-components`](https://github.com/avtc/avtc-pi-ui-components)** — dialog coordinator preventing dialogs from rendering over each other
+- **[`avtc-pi-subagent-ui-bridge`](https://github.com/avtc/avtc-pi-subagent-ui-bridge)** — lets extensions' dialogs from nested subagents render in the root session
+- **[`avtc-pi-unstuck`](https://github.com/avtc/avtc-pi-unstuck)** — auto-continue on empty model responses + configurable timeouts for bash and search tools
 
 **Optional (recommended):**
-- **[`avtc-pi-portrait`](https://github.com/avtc/avtc-pi-portrait)** — persistent behavioral profile (improves agent consistency)
-- **[`avtc-pi-ask-user-question`](https://github.com/avtc/avtc-pi-ask-user-question)** — structured clarification questions (used by the design phase)
-- **[`avtc-pi-user-decisions`](https://github.com/avtc/avtc-pi-user-decisions)** — captures your decisions and re-injects them after context compaction; decisions are shared with subagents via per-root-session storage
-- **[`avtc-pi-notification`](https://github.com/avtc/avtc-pi-notification)** — desktop/Telegram notifications for auto-agent events
+- **[`avtc-pi-portrait`](https://github.com/avtc/avtc-pi-portrait)** — builds a behavioral portrait from your session corrections, injected into the system prompt
+- **[`avtc-pi-ask-user-question`](https://github.com/avtc/avtc-pi-ask-user-question)** — a question tool for the agent with subagent forwarding and attention alerts
+- **[`avtc-pi-user-decisions`](https://github.com/avtc/avtc-pi-user-decisions)** — captures decisions, re-injects into the system prompt after compaction and into subagents
+- **[`avtc-pi-notification`](https://github.com/avtc/avtc-pi-notification)** — bell and Telegram notifications, only fires when you're away
 
 ## Installation
 
 ```bash
-pi install git:github.com/avtc/avtc-pi-feature-flow
+pi install npm:avtc-pi-feature-flow
 ```
-
-### Enabling the kanban board (optional)
-
-The kanban board uses a local SQLite database via `better-sqlite3` (a native module). On most systems the prebuilt binary installs automatically. If you see a `better-sqlite3` load error, allow its install script:
-
-```bash
-npm approve-scripts better-sqlite3   # run in your project directory
-```
-
-Feature-flow works without the kanban — it's optional for managing multiple features in parallel. A single feature needs none of it.
 
 ### Before you start
 
