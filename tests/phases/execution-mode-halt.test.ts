@@ -10,6 +10,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createExecutionModeApplier } from "../../src/phases/execution-mode.js";
 import type { FeatureState } from "../../src/state/feature-state.js";
+import { schedulePostTurnDrain } from "../../src/state/post-turn-dispatch.js";
 import { setSetting, setTestSettings } from "../helpers/settings-test-helpers.js";
 import { cleanupAfterTest, withTempCwd } from "../helpers/workflow-monitor-test-helpers.js";
 
@@ -98,6 +99,11 @@ describe("applyExecutionMode worktree-failure halt", () => {
 
     await apply({ hasUI: false } as ExtensionContext);
 
+    // ff-implement is staged for agent_settled delivery — schedule the deferred drain and flush the timer.
+    vi.useFakeTimers();
+    schedulePostTurnDrain(pi);
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
     expect(sendUserMessage).toHaveBeenCalledTimes(1);
   });
 
@@ -121,6 +127,11 @@ describe("applyExecutionMode worktree-failure halt", () => {
     await apply({ hasUI: false } as ExtensionContext);
 
     expect(ensureWorktreeForExecution).toHaveBeenCalled();
+    // ff-implement is staged for agent_settled delivery — schedule the deferred drain and flush the timer.
+    vi.useFakeTimers();
+    schedulePostTurnDrain(pi);
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
     expect(sendUserMessage).toHaveBeenCalledTimes(1);
   });
 });

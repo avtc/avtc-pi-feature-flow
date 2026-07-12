@@ -15,7 +15,7 @@
  */
 
 import { Type } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { NO_COMPACT_CALLBACK, triggerContextCompact } from "../compaction/compact-trigger.js";
 import { syncWorktreeStatus } from "../git/worktrees/worktree-helpers.js";
@@ -43,6 +43,7 @@ import {
   recordReviewHistory,
   saveFeatureState,
 } from "../state/feature-state.js";
+import { schedulePostTurnFollowUp } from "../state/post-turn-dispatch.js";
 import { isSubagentSession, persistState } from "../state/state-persistence.js";
 import { notifyFeatureCompleted, worthNotesPointerFor } from "../state/worth-notes.js";
 import { NO_FEATURE_STATE, updateWidget } from "../ui/feature-flow-widget.js";
@@ -52,16 +53,27 @@ const MSG_NO_SLUG = "phase_ready failed — no active feature slug.";
 const MSG_NO_STATE = "phase_ready failed — no feature state found.";
 const MSG_NO_CALLBACK = "phase_ready failed — auto-agent callback lost.";
 
-// Unified guard against multiple phase_ready calls within a single AGENT turn
-// (one user prompt → agent_start … agent_end). A "turn" in pi is one LLM response;
-// the agent frequently re-calls phase_ready across several turns within one agent
-// turn (Thinking between calls). turn_end fires between those calls and would
-// reset a turn-scoped guard — so this guard is reset on agent_end instead, which
-// fires once per user prompt, before the dispatched follow-up skill is delivered
-// (the follow-up starts a fresh agent turn with a cleared guard).
+// Unified guard against multiple phase_ready calls within a single AGENT run
+// (one user prompt → agent_start … agent_settled). A "turn" in pi is one LLM
+// response; the agent frequently re-calls phase_ready across several turns within
+// one agent run (Thinking between calls). turn_end fires between those calls and
+// would reset a turn-scoped guard — so this guard is reset on agent_end instead
+// (the per-cycle boundary: every low-level run, including retry/compact/followUp
+// continuations, ends with its own agent_end).
+//
+// IMPORTANT: phase-transition followUps are NOT dispatched inline. An inline
+// followUp would drain inside the same agent loop with NO agent_end between the
+// dispatching turn and the followUp-driven turn (pi: "the agent loop drains both
+// queues before emitting agent_end"), so this run's phase_ready would still hold
+// the guard and the followUp skill's own phase_ready would be deduped. Such
+// followUps are staged via schedulePostTurnFollowUp and drained (deferred) by
+// the agent_settled handler. agent_settled fires only when pi has no pending
+// continuation, and at that point session.isStreaming is false, so the drained
+// followUp starts a FRESH agent run. agent_end therefore fires between every
+// iteration and the guard resets correctly.
 //
 // Set ONLY when phase_ready is honored — gates passed AND a real action occurred
-// (phase transition OR follow-up dispatch). NOT on gate failures / no-ops / UI
+// (phase transition OR followUp staged). NOT on gate failures / no-ops / UI
 // "Discuss". This lets the agent legitimately retry (e.g. verify after running
 // tests) while collapsing any confused repeated call into a single transition.
 let phaseReadyPassed = false;
@@ -148,7 +160,6 @@ type ReviewLoopResult = { kind: "first-iteration" } | { kind: "should-loop" } | 
  */
 async function handleReviewLoop(
   deps: PhaseReadyDeps,
-  pi: ExtensionAPI,
   ctx: ExtensionContext,
   handler: FeatureSession,
   slug: string,
@@ -172,13 +183,17 @@ async function handleReviewLoop(
     startReviewIteration(handler, slug, opts.phaseName, state);
     syncEnvVarsFromState(handler);
     updateWidget(handler, NO_FEATURE_STATE);
-    pi.sendUserMessage(
+    // Stage the review-skill followUp for delivery after agent_settled (not
+    // inline): an inline followUp would drain inside the same agent loop with no
+    // agent_end between runs, so this run's phase_ready would still hold the
+    // guard and the next run's phase_ready would be deduped. Staging defers
+    // delivery to the agent_settled handler (deferred), which starts a fresh run.
+    schedulePostTurnFollowUp(
       buildReviewFollowUp(deps, {
         skillName: opts.skillName,
         label: opts.label,
         loopNumber: 0,
       }),
-      { deliverAs: "followUp" },
     );
     return { kind: "first-iteration" };
   }
@@ -237,7 +252,7 @@ async function handleReviewLoop(
       return { kind: "should-loop" };
     }
 
-    pi.sendUserMessage(substituted, { deliverAs: "followUp" });
+    schedulePostTurnFollowUp(substituted);
     return { kind: "should-loop" };
   }
 
@@ -356,7 +371,6 @@ export function registerPhaseReady(deps: PhaseReadyDeps): IPhaseReady {
           }
           const loopResult = await handleReviewLoop(
             deps,
-            pi,
             ctx,
             handler,
             planSlug,
@@ -434,9 +448,9 @@ export function registerPhaseReady(deps: PhaseReadyDeps): IPhaseReady {
           persistState(pi, handler);
           updateWidget(handler, NO_FEATURE_STATE);
 
-          pi.sendUserMessage(expandSkillCommand(`/skill:${reviewSkill}`, NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME), {
-            deliverAs: "followUp",
-          });
+          schedulePostTurnFollowUp(
+            expandSkillCommand(`/skill:${reviewSkill}`, NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME),
+          );
         } else {
           // No review skill — skip to review, then transition through it to UAT/finish
           handler.setCurrentPhase("review");
@@ -568,7 +582,6 @@ export function registerPhaseReady(deps: PhaseReadyDeps): IPhaseReady {
         }
         const loopResult = await handleReviewLoop(
           deps,
-          pi,
           ctx,
           handler,
           slug,
@@ -681,9 +694,7 @@ export function registerPhaseReady(deps: PhaseReadyDeps): IPhaseReady {
               return textResult("");
             }
           }
-          pi.sendUserMessage(expandSkillCommand("/skill:ff-plan", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME), {
-            deliverAs: "followUp",
-          });
+          schedulePostTurnFollowUp(expandSkillCommand("/skill:ff-plan", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME));
         }
 
         return textResult("");
@@ -713,15 +724,15 @@ export function registerPhaseReady(deps: PhaseReadyDeps): IPhaseReady {
     },
   });
 
-  // The once-per-agent-turn guard (phaseReadyPassed) is reset from the
-  // agent_end handler in agent-lifecycle.ts (single agent_end handler, avoids
-  // handler-ordering issues with getSingleHandler in tests). agent_end fires once
-  // per user prompt, before the dispatched follow-up skill is delivered, so the
-  // follow-up's fresh agent turn starts with a cleared guard — the legitimate
-  // next phase_ready (e.g. the ff-review skill ending its iteration) processes.
+  // The once-per-agent-run guard (phaseReadyPassed) is reset from the
+  // agent_end handler (auto-agent-events.ts) — the per-cycle boundary. The staged
+  // phase-transition followUp is drained (deferred) by the agent_settled handler
+  // (post-turn-dispatch.ts), which starts a fresh agent run. So agent_end fires
+  // between every run, the guard is cleared, and the next run's phase_ready (e.g.
+  // the ff-review skill ending its iteration) processes instead of being deduped.
   // NOTE: intentionally NOT reset on turn_end — a pi "turn" is one LLM response,
-  // and the agent's repeated phase_ready calls span multiple turns within one
-  // agent turn, so a turn_end reset would let the second call dispatch again.
+  // and a confused model's repeated phase_ready calls span multiple turns within
+  // one agent turn (those repeats must stay collapsed until the turn truly ends).
 
   return {
     resetTracking() {

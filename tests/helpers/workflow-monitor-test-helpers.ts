@@ -12,7 +12,7 @@ import type {
   ExtensionEvent,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 import type { KanbanDatabase } from "../../src/kanban/data/kanban-database.js";
 import { PiCtx } from "../../src/shared/types.js";
 import { ensureFfJunction } from "../../src/state/artifact-junction.js";
@@ -233,6 +233,21 @@ export async function fireAllHandlers(
     result = await (handler as (...args: unknown[]) => Promise<unknown>)(...args);
   }
   return result;
+}
+
+/**
+ * Fire `agent_settled` (the deferred phase-transition followUp drain point) and flush
+ * the ~DRAIN_DELAY_MS timer so the staged followUp is delivered synchronously.
+ * Mirrors the real lifecycle: agent_end (per-cycle) → agent_settled (pi idle) →
+ * deferred drain fires. Use after firing `agent_end` when a test needs the staged
+ * followUp to have been dispatched. Enables fake timers BEFORE agent_settled so the
+ * drain's setTimeout is captured, then advances and restores real timers.
+ */
+export async function settleAndDrainPostTurnFollowUp(handlers: Map<string, Handler[]>): Promise<void> {
+  vi.useFakeTimers();
+  await fireAllHandlers(handlers, "agent_settled", {});
+  vi.advanceTimersByTime(1000);
+  vi.useRealTimers();
 }
 
 export type FakePi = ReturnType<typeof createFakePi>;
@@ -485,6 +500,8 @@ export interface Sent {
 export function captureTaskReadyAdvanceTool(): {
   getTool: () => ToolDefinition | undefined;
   sent: Sent[];
+  /** The fake pi — exposed so tests can drain staged post-turn followUps via drainPostTurnFollowUp(pi). */
+  pi: ExtensionAPI;
 } {
   let toolDef: ToolDefinition | undefined;
   const sent: Sent[] = [];
@@ -500,5 +517,6 @@ export function captureTaskReadyAdvanceTool(): {
   return {
     getTool: () => toolDef,
     sent,
+    pi,
   };
 }

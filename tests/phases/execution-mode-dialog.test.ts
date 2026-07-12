@@ -16,6 +16,7 @@ import { setSetting, setTestSettings } from "../helpers/settings-test-helpers.js
 import {
   createPiWithToolCapture,
   fireAllHandlers,
+  settleAndDrainPostTurnFollowUp,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
 
@@ -54,6 +55,18 @@ async function firePlanReady() {
     hasUI: false,
     ui: { setWidget: () => {}, select: async () => "Continue" },
   });
+  // ff-implement is staged for agent_settled delivery — settle + drain it so callers can assert on it.
+  await fireAllHandlers(
+    fake.handlers,
+    "agent_end",
+    {},
+    {
+      hasUI: false,
+      sessionManager: { getBranch: () => [], getSessionFile: () => "/tmp/session.jsonl" },
+      ui: { setWidget: () => {}, select: async () => "Continue" },
+    },
+  );
+  await settleAndDrainPostTurnFollowUp(fake.handlers);
   return { fake };
 }
 

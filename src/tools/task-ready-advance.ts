@@ -42,6 +42,7 @@ import {
   NO_FEATURE_STATE_OVERRIDE,
 } from "../shared/workflow-refs.js";
 import { slugifyTaskDesignation } from "../state/artifact-paths.js";
+import { schedulePostTurnFollowUp } from "../state/post-turn-dispatch.js";
 import { persistState } from "../state/state-persistence.js";
 import { textResult } from "./text-result.js";
 
@@ -225,9 +226,8 @@ export function registerTaskReadyAdvance(pi: ExtensionAPI, recoverCompactFailure
       );
       if (!fired) {
         // Fallback: fire on ANY !fired (busy / mode≠compact / below-threshold) so the verify skill still dispatches.
-        pi.sendUserMessage(expandSkillCommand("/skill:ff-verify", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME), {
-          deliverAs: "followUp",
-        });
+        // Staged for agent_end delivery (see post-turn-dispatch) so it starts a fresh agent cycle.
+        schedulePostTurnFollowUp(expandSkillCommand("/skill:ff-verify", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME));
       }
       return textResult("End your turn, wait for instructions for advancing to the next phase.");
     },

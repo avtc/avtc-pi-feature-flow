@@ -18,6 +18,8 @@ Feature-flow makes agentic development predictable and deterministic:
 
 ## Requirements
 
+**Pi 0.80.4 or later** must be installed.
+
 **Git** must be installed separately — needed for per-feature worktrees, review diffs, and TDD guardrails.
 
 Installing via `pi install npm:avtc-pi-feature-flow` bundles these extensions automatically:

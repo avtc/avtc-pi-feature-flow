@@ -14,12 +14,13 @@
  * The events/agent/ routers own the pi.on registration and call these methods.
  */
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { setFinishPhaseWhitelisted } from "../../git/worktrees/worktree-lifecycle.js";
 import { log, NO_ERROR } from "../../log.js";
 import { getSettings } from "../../settings/settings-ui.js";
 import type { IAgentLifecycle, ICompaction, IPhaseReady } from "../../shared/workflow-types.js";
 import type { FeatureSession } from "../../state/feature-session.js";
+import { schedulePostTurnDrain } from "../../state/post-turn-dispatch.js";
 import { isSubagentSession } from "../../state/state-persistence.js";
 import type { AutoAgentCallback } from "./auto-agent-state-machine.js";
 
@@ -35,6 +36,7 @@ const RETRYABLE_ERROR_RE =
   /overloaded|provider.?returned.?error|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|internal.?error|network.?error|connection.?error|connection.?refused|connection.?lost|websocket.?closed|websocket.?error|other side closed|fetch failed|upstream.?connect|reset before headers|socket hang up|ended without|http2 request did not get a response|timed? out|timeout|terminated|retry delay/i;
 
 export interface AgentLifecycleDeps {
+  pi: ExtensionAPI;
   handler: FeatureSession;
   compaction: ICompaction;
   phaseReady: IPhaseReady;
@@ -46,7 +48,7 @@ export interface AgentLifecycleDeps {
  * agent_start / agent_end handler bodies — the events/agent/ routers call them.
  */
 export function createAgentLifecycle(deps: AgentLifecycleDeps): IAgentLifecycle {
-  const { handler, compaction, phaseReady, getAutoAgentCallback } = deps;
+  const { pi, handler, compaction, phaseReady, getAutoAgentCallback } = deps;
 
   async function onAgentStart(): Promise<void> {
     compaction.setAgentFinished(false);
@@ -71,11 +73,14 @@ export function createAgentLifecycle(deps: AgentLifecycleDeps): IAgentLifecycle 
   ): Promise<void> {
     // Clear finish-phase guardrail whitelist flag on agent end
     setFinishPhaseWhitelisted(false);
-    // Reset the once-per-agent-turn phase_ready guard. agent_end fires once per
-    // user prompt, before any dispatched follow-up skill is delivered — so the
-    // follow-up's fresh agent turn starts with a cleared guard. NOT reset on
-    // turn_end: a pi "turn" is one LLM response, and the agent's repeated
-    // phase_ready calls span multiple turns within one agent turn.
+    // Reset the once-per-agent-turn phase_ready guard. This is the per-cycle
+    // boundary for the guard: each low-level run (including retry / compact /
+    // followUp continuations) ends with its own agent_end, so the guard is cleared
+    // here between every cycle. NOT reset on turn_end: a pi "turn" is one LLM
+    // response, and a confused model's repeated phase_ready calls span multiple
+    // turns within one agent run (those repeats must stay collapsed until the run
+    // truly ends). The phase-transition followUp itself is drained at
+    // agent_settled (see onAgentSettled), not here.
     phaseReady.resetTracking();
     // Don't trigger finish-done detection if Pi will auto-retry — the agent hasn't truly finished.
     // Pi emits agent_end before its own retry check, so we must detect this ourselves.
@@ -123,5 +128,15 @@ export function createAgentLifecycle(deps: AgentLifecycleDeps): IAgentLifecycle 
     }
   }
 
-  return { onAgentStart, onAgentEnd };
+  async function onAgentSettled(): Promise<void> {
+    // pi will not continue automatically — deliver any phase-transition followUp
+    // staged during the run (design/plan review iterations, phase handoffs). The
+    // drain is DEFERRED (see post-turn-dispatch.ts): a synchronous sendUserMessage
+    // here would re-enter _runAgentPrompt before the outer run's finally unwinds,
+    // and the delay lets a user message typed at settle time start its turn first
+    // (the staged followUp then enqueues behind it instead of racing it).
+    schedulePostTurnDrain(pi);
+  }
+
+  return { onAgentStart, onAgentEnd, onAgentSettled };
 }

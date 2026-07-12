@@ -17,6 +17,7 @@ import {
   fireAllHandlers,
   getSingleHandler,
   getToolHandlers,
+  settleAndDrainPostTurnFollowUp,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
 
@@ -194,6 +195,8 @@ describe("auto-advance model overrides", () => {
     expect(setModelCalls[0]).toEqual({ provider: "anthropic", id: "claude-sonnet-4-5" });
 
     // Verify the review skill was dispatched
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     expect(fake.sentMessages[0].message).toContain("review");
   });
@@ -271,6 +274,8 @@ describe("auto-advance model overrides", () => {
     expect(setModelCalls[0]).toEqual({ provider: "deepseek", id: "deepseek-chat" });
 
     // Verify the verification skill was dispatched
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     expect(fake.sentMessages[0].message).toContain("ff-verify");
   });

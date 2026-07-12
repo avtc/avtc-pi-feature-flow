@@ -29,6 +29,7 @@ import { NO_AGENT_NAME, NO_FEATURE_STATE_OVERRIDE } from "../shared/workflow-ref
 import type { ICompaction, IGuardrails, IPhaseReady, ISessionLifecycle } from "../shared/workflow-types.js";
 import { withCoordinator } from "../snippets/vendored/subscribe-to-dialog-coordinator.js";
 import { type FeatureSession, NO_ACTIVE_FEATURE_STATE } from "../state/feature-session.js";
+import { clearPostTurnFollowUp } from "../state/post-turn-dispatch.js";
 import { NO_FEATURE_STATE, updateWidget } from "../ui/feature-flow-widget.js";
 import { recoverArtifactsFromDisk, trackSessionFileInState } from "./feature-management.js";
 import {
@@ -97,6 +98,7 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): ISessionLife
     guardrails.resetTracking();
     compaction.resetTracking();
     deps.phaseReady.resetTracking();
+    clearPostTurnFollowUp();
   };
 
   const trackSessionFile = (ctx: ExtensionContext, slug: string) => {

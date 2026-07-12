@@ -11,10 +11,12 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ICompaction } from "../../shared/workflow-types.js";
+import { clearPostTurnFollowUp } from "../../state/post-turn-dispatch.js";
 
 export function registerSessionShutdown(pi: ExtensionAPI, compaction: ICompaction): void {
   pi.on("session_shutdown", () => {
     compaction.onSessionShutdown();
+    clearPostTurnFollowUp();
     const bridge = globalThis.__piWorkflowMonitor;
     if (bridge?.archiveTimer) {
       clearInterval(bridge.archiveTimer);

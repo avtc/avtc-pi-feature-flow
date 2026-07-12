@@ -533,6 +533,7 @@ async function initWorkflowMonitor(pi: ExtensionAPI, _deps: { todoApi: ReturnTyp
 
   // Agent-lifecycle domain object (agent_start/agent_end handler bodies).
   const agentLifecycle = createAgentLifecycle({
+    pi,
     handler,
     compaction,
     phaseReady,

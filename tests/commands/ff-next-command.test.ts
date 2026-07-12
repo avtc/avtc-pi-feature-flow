@@ -12,6 +12,7 @@ import {
   fireAllHandlers,
   getExtendedToolHandlers,
   getSingleHandler,
+  settleAndDrainPostTurnFollowUp,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
 
@@ -173,6 +174,9 @@ describe("ff:next (rewritten)", () => {
 
     await workflowNext("", ctx);
 
+    // ff-finish is staged for agent_end delivery — drain before asserting.
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     // Should have sent finishing skill
     const finishMsg = fake.sentMessages.find((m) => m.message.includes("ff-finish"));
     expect(finishMsg).toBeDefined();
@@ -278,6 +282,9 @@ describe("ff:next (rewritten)", () => {
 
     await workflowNext("", ctx);
 
+    // ff-finish is staged for agent_end delivery — drain before asserting.
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     // Should have sent finishing skill (not review)
     const finishMsg = fake.sentMessages.find((m) => m.message.includes("ff-finish"));
     expect(finishMsg).toBeDefined();
@@ -289,8 +296,10 @@ describe("ff:next (rewritten)", () => {
     // Should have advanced to finish (after-finish UAT driven by the derived check in phase_ready)
     const { loadFeatureState } = await import("../../src/state/feature-state.js");
     const state = loadFeatureState(slug, null);
-    expect(state?.workflow.currentPhase).toBe("finish");
-    expect((state?.workflow as { phases?: { uat?: string } }).phases?.uat).toBe("pending"); // not yet activated — cast for legacy test
+    expect(state).not.toBeNull();
+    const workflow = state?.workflow as { currentPhase: string; phases?: { uat?: string } };
+    expect(workflow.currentPhase).toBe("finish");
+    expect(workflow.phases?.uat).toBe("pending"); // not yet activated — cast for legacy test
   });
 
   test("ff:next review→UAT handoff merges the worth-notes pointer when notes exist", async () => {

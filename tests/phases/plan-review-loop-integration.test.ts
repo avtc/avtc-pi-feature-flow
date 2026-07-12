@@ -17,6 +17,7 @@ import {
   fireAllHandlers,
   NO_UI_CTX,
   PLAN_ACTIVE_STATE,
+  settleAndDrainPostTurnFollowUp,
   setupPiCtx,
   TUI_MODE,
   withTempCwd,
@@ -91,6 +92,8 @@ describe("design review loop — full lifecycle integration", () => {
     expect(state0?.design.reviewLoopCount).toBe(1);
 
     // Verify followUp sent with context prefix (first iteration, loop 0)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUp0 = fake.sentMessages[fake.sentMessages.length - 1];
     expect(followUp0.message).toContain("ff-design-review");
     expect(followUp0.message).toContain("**Feature:** `integration-test-feature`");
@@ -100,6 +103,7 @@ describe("design review loop — full lifecycle integration", () => {
 
     // Simulate agent turn ending before the next review iteration
     await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
 
     // --- Iteration 1: phase_ready(review_iteration, issuesFound=2) → loop ---
     const phaseResult1 = await phaseReady.execute("tc-phase-1", { issuesFound: 2 }, undefined, undefined, NO_UI_CTX);
@@ -112,6 +116,8 @@ describe("design review loop — full lifecycle integration", () => {
     expect(state1?.design.reviewLoopCount).toBe(2);
 
     // Verify followUp sent with context prefix (loop 1)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUp1 = fake.sentMessages[fake.sentMessages.length - 1];
     expect(followUp1.message).toContain("ff-design-review");
     expect(followUp1.message).toContain("**Review loop:** `1`");
@@ -120,6 +126,7 @@ describe("design review loop — full lifecycle integration", () => {
 
     // Simulate agent turn ending before the next review iteration
     await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
 
     // --- Iteration 2: phase_ready(review_iteration, issuesFound=0) → no loop, completion ---
     const selectFn2 = vi.fn().mockResolvedValue("Proceed with implementation");
@@ -173,6 +180,8 @@ describe("design review loop — full lifecycle integration", () => {
     ).toBe("plan");
 
     // Writing-plans skill dispatched
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("ff-plan");
   });
@@ -199,6 +208,8 @@ describe("design review loop — full lifecycle integration", () => {
     expect(state0?.plan.reviewLoopCount).toBe(1);
 
     // Verify followUp sent with context prefix
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUp0 = fake.sentMessages[fake.sentMessages.length - 1];
     expect(followUp0.message).toContain("ff-plan-review");
     expect(followUp0.message).toContain("**Feature:** `plan-integration-feature`");
@@ -207,6 +218,7 @@ describe("design review loop — full lifecycle integration", () => {
 
     // Simulate agent turn ending before the next review iteration
     await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
 
     // --- Iteration 1: phase_ready(review_iteration, issuesFound=1) → loop ---
     const phaseResult1 = await phaseReady.execute(
@@ -222,12 +234,15 @@ describe("design review loop — full lifecycle integration", () => {
     const state1 = loadFeatureState("plan-integration-feature", null);
     expect(state1?.plan.reviewLoopCount).toBe(2);
 
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUp1 = fake.sentMessages[fake.sentMessages.length - 1];
     expect(followUp1.message).toContain("plan review iteration");
     expect(followUp1.message).toContain("**Review loop:** `1`");
 
     // Simulate agent turn ending before the next review iteration
     await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
 
     // --- Iteration 2: phase_ready(review_iteration, issuesFound=0) → no loop ---
     const phaseResult2 = await phaseReady.execute(
@@ -271,6 +286,7 @@ describe("design review loop — full lifecycle integration", () => {
 
     // Simulate agent turn ending before the next review iteration
     await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
 
     // Iteration 2: loopCount=1, issuesFound=0, min=2 now met (loopsCompleted=2 >= 2) → should NOT loop
     // falls through to design completion

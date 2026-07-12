@@ -15,6 +15,7 @@ import {
   fireAllHandlers,
   NO_UI_CTX,
   PLAN_ACTIVE_STATE,
+  settleAndDrainPostTurnFollowUp,
   withTempCwd,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
@@ -62,6 +63,8 @@ describe("design/plan review context prefix", () => {
     await phaseReady.execute("tc-ctx-1", { issuesFound: 2 }, undefined, undefined, NO_UI_CTX);
 
     // Verify followUp contains context prefix
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const followUp = fake.sentMessages[fake.sentMessages.length - 1];
     expect((followUp.options as { deliverAs?: string } | undefined)?.deliverAs).toBe("followUp");
@@ -94,6 +97,8 @@ describe("design/plan review context prefix", () => {
     // Trigger loop gate
     await phaseReady.execute("tc-plan-ctx-1", { issuesFound: 1 }, undefined, undefined, NO_UI_CTX);
 
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const followUp = fake.sentMessages[fake.sentMessages.length - 1];
     expect((followUp.options as { deliverAs?: string } | undefined)?.deliverAs).toBe("followUp");
@@ -143,6 +148,8 @@ describe("design/plan review context prefix", () => {
     expect(state?.design.reviewLoopCount).toBe(1);
 
     // Verify followUp sent with context
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const followUp = fake.sentMessages[fake.sentMessages.length - 1];
     expect(followUp.message).toContain("ff-design-review");
@@ -170,6 +177,8 @@ describe("design/plan review context prefix", () => {
     // Trigger loop gate from iteration 1 → should send iteration 2
     await phaseReady.execute("tc-loop-incr", { issuesFound: 1 }, undefined, undefined, NO_UI_CTX);
 
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const followUp = fake.sentMessages[fake.sentMessages.length - 1];
     expect(followUp.message).toContain("ff-design-review");
@@ -227,6 +236,9 @@ describe("design/plan review context prefix", () => {
 
     await phaseReady.execute("tc-known-issues", { issuesFound: 1 }, undefined, undefined, NO_UI_CTX);
 
+    // The review followUp is staged — drain at agent_end before asserting on it.
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUp = fake.sentMessages[fake.sentMessages.length - 1];
     expect(followUp.message).toContain("**Known issues:**");
     expect(followUp.message).toContain("known-issues-feature-design-known-issues.md");

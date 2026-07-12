@@ -25,6 +25,7 @@
 
 import { registerWorktreeInterception } from "../git/worktrees/worktree-interception.js";
 import { registerAgentEnd } from "./agent/agent-end.js";
+import { registerAgentSettled } from "./agent/agent-settled.js";
 import { registerAgentStart } from "./agent/agent-start.js";
 import { registerTurnEnd } from "./agent/turn-end.js";
 import { registerTurnStart } from "./agent/turn-start.js";
@@ -79,9 +80,10 @@ export function registerAllEvents(deps: EventDeps): void {
   // index.ts (registerSessionLifecycleCommands + wireSessionLifecycleBridge); the
   // session_start/session_tree pi.on registrations live here.
 
-  // agent_start (reset tracking + re-arm finish guardrail) + agent_end (clear + finish-done + notify) — events/agent/
+  // agent_start (reset tracking + re-arm finish guardrail) + agent_end (clear + finish-done + notify) + agent_settled (deferred phase-transition followUp drain) — events/agent/
   registerAgentStart(pi, agentLifecycle);
   registerAgentEnd(pi, agentLifecycle);
+  registerAgentSettled(pi, agentLifecycle);
 
   // turn_start (grace pause + auto-agent unblock) + turn_end (model capture + grace resume) — events/agent/
   registerTurnStart(pi, kanbanTurn);

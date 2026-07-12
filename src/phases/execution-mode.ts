@@ -19,6 +19,7 @@ import { getSettings } from "../settings/settings-ui.js";
 import { NO_AGENT_NAME, NO_FEATURE_STATE_OVERRIDE } from "../shared/workflow-refs.js";
 import type { FeatureSession } from "../state/feature-session.js";
 import { DEFAULT_DIR, type ExpandSkillCommandFn, type FeatureState, saveFeatureState } from "../state/feature-state.js";
+import { schedulePostTurnFollowUp } from "../state/post-turn-dispatch.js";
 import { persistState } from "../state/state-persistence.js";
 import { NO_FEATURE_STATE, updateWidget } from "../ui/feature-flow-widget.js";
 
@@ -71,9 +72,7 @@ export function createExecutionModeApplier(deps: ExecutionModeDeps) {
       }
     }
 
-    pi.sendUserMessage(expandSkillCommand("/skill:ff-implement", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME), {
-      deliverAs: "followUp",
-    });
+    schedulePostTurnFollowUp(expandSkillCommand("/skill:ff-implement", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME));
   }
 
   return applyExecutionMode;

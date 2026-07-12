@@ -14,6 +14,7 @@ import {
   enableSubagentMode,
   fireAllHandlers,
   NO_AUTO_AGENT_CALLBACK,
+  settleAndDrainPostTurnFollowUp,
   UAT_ACTIVE_STATE,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
@@ -113,6 +114,9 @@ describe("ff:next from UAT (replaces former /uat-accept)", () => {
       ),
     ).toBe(true);
     expect(state?.workflow.currentPhase).toBe("finish");
+    // ff-finish is staged for agent_end delivery — drain before asserting.
+    await fireAllHandlers(fake.handlers, "agent_end", {}, mockCtx);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     // Should send finishing skill
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     expect(fake.sentMessages[0].message).toContain("ff-finish");

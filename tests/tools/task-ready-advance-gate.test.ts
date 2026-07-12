@@ -11,6 +11,7 @@ import { setGuardrailsRef } from "../../src/shared/workflow-refs.js";
 import type { IGuardrails } from "../../src/shared/workflow-types.js";
 import type { FeatureSession } from "../../src/state/feature-session.js";
 import type { FeatureState } from "../../src/state/feature-state.js";
+import { schedulePostTurnDrain } from "../../src/state/post-turn-dispatch.js";
 import { setSetting, setTestSettings } from "../helpers/settings-test-helpers.js";
 import {
   captureTaskReadyAdvanceTool,
@@ -363,8 +364,13 @@ describe("task_ready_advance gate cycle (dispatch model)", () => {
     setSetting("perTaskReviewMode", "off");
     installHandler("1. Final task", { "1-final-task": 0 });
     setGuardrailsRef({ setVerifyTestsPassed: () => {} } as unknown as IGuardrails);
-    const { getTool, sent } = captureTaskReadyAdvanceTool();
+    const { getTool, sent, pi } = captureTaskReadyAdvanceTool();
     await getTool()?.execute("id", {}, undefined, undefined, makeCtx(NOOP)); // nextTask omitted, todos done
+    // ff-verify is staged for agent_settled delivery — schedule the deferred drain and flush the timer.
+    vi.useFakeTimers();
+    schedulePostTurnDrain(pi);
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
     expect(sent.some((s) => s.text.includes("ff-verify"))).toBe(true);
   });
 
@@ -373,7 +379,7 @@ describe("task_ready_advance gate cycle (dispatch model)", () => {
   test("single-task plan: START → ENTRY dispatch round 1 → clean recall with nextTask omitted → last→verify", async () => {
     const featureState = installHandler(null); // no current task
     setGuardrailsRef({ setVerifyTestsPassed: () => {} } as unknown as IGuardrails);
-    const { getTool, sent } = captureTaskReadyAdvanceTool();
+    const { getTool, sent, pi } = captureTaskReadyAdvanceTool();
 
     // --- call 1: START the only task (cur null) → enter task, NO dispatch (deferred to recall) ---
     let result = await getTool()?.execute("id", { nextTask: "1. Only task" }, undefined, undefined, makeCtx(NOOP));
@@ -403,6 +409,11 @@ describe("task_ready_advance gate cycle (dispatch model)", () => {
     expect((result?.content?.[0] as { text: string } | undefined)?.text ?? "").toMatch(
       /wait for instructions for advancing to the next phase/i,
     );
+    // ff-verify is staged for agent_settled delivery — schedule the deferred drain and flush the timer.
+    vi.useFakeTimers();
+    schedulePostTurnDrain(pi);
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
     const newSent = sent.slice(beforeVerify);
     expect(newSent.some((s) => s.text.includes("ff-verify"))).toBe(true);
     expect(newSent.some((s) => s.text.includes("ff-task-gate"))).toBe(false);

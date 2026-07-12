@@ -27,6 +27,7 @@ import {
   NO_TODO_OVERRIDE,
   NO_UI_CTX,
   NOT_ALL_TODOS_DONE,
+  settleAndDrainPostTurnFollowUp,
   setupPiCtx,
   TUI_MODE,
   writeFeatureStateFile,
@@ -106,6 +107,8 @@ describe("phase_ready tool — stub registration", () => {
     } as unknown as ExtensionContext);
     // Plan interceptor dispatches ff-implement when maxPlanReviewRounds=off
     expect((result.content[0] as unknown as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain('<skill name="ff-implement"');
@@ -207,6 +210,8 @@ describe("phase_ready tool — design non-auto mode", () => {
     expect(lastEntry.data.featureState.workflow.currentPhase).toBe("plan");
 
     // Verify ff-plan skill was sent
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("ff-plan");
@@ -285,6 +290,8 @@ describe("phase_ready tool — design non-auto mode", () => {
     expect(lastEntry.data.featureState.workflow.currentPhase).toBe("plan");
 
     // Writing-plans skill sent
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("ff-plan");
   });
@@ -359,6 +366,8 @@ describe("phase_ready tool — design non-auto mode", () => {
     expect(lastEntry.data.featureState.workflow.currentPhase).toBe("plan");
 
     // Writing-plans skill sent
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("ff-plan");
   });
@@ -587,6 +596,8 @@ describe("phase_ready tool — edge cases", () => {
     const _result = await phaseReady.execute("tc-no-artifact", {}, undefined, undefined, ctx);
 
     // Should still proceed — advanceWorkflowTo("plan") and send ff-plan
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("ff-plan");
@@ -999,6 +1010,8 @@ describe("phase_ready tool — verify phase", () => {
     expect(lastEntry.data.featureState.workflow.currentPhase).toBe("review");
 
     // Review skill sent as followUp
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBe(1);
     expect(fake.sentMessages[0].message).toMatch(/^<skill name="ff-review"/);
     expect(fake.sentMessages[0].options).toEqual({ deliverAs: "followUp" });
@@ -1052,6 +1065,8 @@ describe("phase_ready tool — verify phase", () => {
     const result = await phaseReady.execute("tc-verify-loops", {}, undefined, undefined, ctx);
 
     expect((result.content[0] as unknown as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBe(1);
     expect(fake.sentMessages[0].message).toContain('<skill name="ff-review"');
     expect(fake.sentMessages[0].options).toEqual({ deliverAs: "followUp" });
@@ -1177,6 +1192,8 @@ describe("phase_ready tool — verify phase", () => {
 
     // All todos done — transition succeeds
     expect((result.content[0] as unknown as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBe(1);
     expect(fake.sentMessages[0].message).toMatch(/^<skill name="ff-review"/);
   });
@@ -1213,6 +1230,8 @@ describe("phase_ready tool — verify phase", () => {
 
     // No todos — fail-open allows transition
     expect((result.content[0] as unknown as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBe(1);
     expect(fake.sentMessages[0].message).toMatch(/^<skill name="ff-review"/);
   });

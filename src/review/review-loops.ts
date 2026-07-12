@@ -17,6 +17,7 @@ import { type FeatureFlowSettings, getSettings, resolveReviewSkill } from "../se
 import { NO_AGENT_NAME, NO_FEATURE_STATE_OVERRIDE } from "../shared/workflow-refs.js";
 import type { FeatureSession } from "../state/feature-session.js";
 import { DEFAULT_DIR, type ExpandSkillCommandFn, type FeatureState, saveFeatureState } from "../state/feature-state.js";
+import { schedulePostTurnFollowUp } from "../state/post-turn-dispatch.js";
 import { worthNotesPointerFor } from "../state/worth-notes.js";
 import { NO_FEATURE_STATE, updateWidget } from "../ui/feature-flow-widget.js";
 import { generateReviewReport } from "./review-report.js";
@@ -108,7 +109,7 @@ export function createReviewLoopHandlers(deps: ReviewLoopDeps) {
         );
         if (!compacted) {
           const skillText = expandSkillCommand(`/skill:${reviewSkill}`, NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME);
-          pi.sendUserMessage(skillText, { deliverAs: "followUp" });
+          schedulePostTurnFollowUp(skillText);
         }
       }
     } else {

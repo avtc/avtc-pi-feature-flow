@@ -18,6 +18,7 @@ import {
   fireAllHandlers,
   getSingleHandler,
   getToolHandlers,
+  settleAndDrainPostTurnFollowUp,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
 
@@ -113,6 +114,9 @@ describe("auto phase transition execute → verify → review", () => {
     } as unknown as ExtensionContext);
 
     expect((result.content[0] as { text: string }).text).toMatch(/advancing to the next phase/i);
+    // ff-verify is staged for agent_settled delivery — settle + drain before asserting.
+    await fireAllHandlers(fake.handlers, "agent_end", {}, createCtx(NO_UI, NO_BRANCH));
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     // Should send exactly one followUp message with the verification skill
     expect(fake.sentMessages.length).toBe(1);
     expect(fake.sentMessages[0].message).toMatch(/^<skill name="ff-verify"/);
@@ -194,8 +198,13 @@ describe("auto phase transition execute → verify → review", () => {
       ui: { setWidget: () => {}, select: vi.fn(), confirm: vi.fn(), input: vi.fn(), notify: vi.fn() },
     } as unknown as ExtensionContext);
 
-    // phase_ready triggers the transition — sends review skill
+    // phase_ready triggers the transition — stages the review skill (drained at agent_end)
     expect((result.content[0] as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, {
+      hasUI: false,
+      ui: { setWidget: () => {}, select: vi.fn(), confirm: vi.fn(), input: vi.fn(), notify: vi.fn() },
+    } as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBe(1);
     expect(fake.sentMessages[0].message).toMatch(/^<skill name="ff-review"/);
     expect(fake.sentMessages[0].options).toEqual({ deliverAs: "followUp" });
@@ -360,8 +369,13 @@ describe("auto phase transition execute → verify → review", () => {
       ui: { setWidget: () => {}, select: vi.fn(), confirm: vi.fn(), input: vi.fn(), notify: vi.fn() },
     } as unknown as ExtensionContext);
 
-    // maxFeatureReviewRounds='3' → should dispatch ff-review
+    // maxFeatureReviewRounds='3' → should dispatch ff-review (staged, drained at agent_end)
     expect((result.content[0] as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, {
+      hasUI: false,
+      ui: { setWidget: () => {}, select: vi.fn(), confirm: vi.fn(), input: vi.fn(), notify: vi.fn() },
+    } as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBe(1);
     expect(fake.sentMessages[0].message).toContain('<skill name="ff-review"');
     expect(fake.sentMessages[0].options).toEqual({ deliverAs: "followUp" });

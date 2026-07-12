@@ -21,6 +21,7 @@ import {
   NO_AUTO_AGENT_CALLBACK,
   NO_UI_CTX,
   PLAN_ACTIVE_STATE,
+  settleAndDrainPostTurnFollowUp,
   setupPiCtx,
   TUI_MODE,
   writeFeatureStateFile,
@@ -72,6 +73,8 @@ describe("phase_ready review loop — design phase", () => {
     expect(state?.review.reviewHistory?.[0]).toMatchObject({ phase: "design", loopNumber: 0, issuesFound: 3 });
 
     // Should have sent a followUp message to run next iteration
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("design review iteration");
@@ -140,6 +143,8 @@ describe("phase_ready review loop — design phase", () => {
     const state = loadFeatureState("2026-05-20-design-numbering", null);
     expect(state?.design.reviewLoopCount).toBe(2);
 
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage.options as { deliverAs?: string })?.deliverAs).toBe("followUp");
@@ -223,6 +228,8 @@ describe("phase_ready review loop — design phase", () => {
     expect(lastEntry.data.featureState.workflow.currentPhase).toBe("plan");
 
     // Writing-plans skill sent
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("ff-plan");
   });
@@ -357,6 +364,8 @@ describe("phase_ready review loop — design phase", () => {
     const state = loadFeatureState("2026-05-20-design-min", null);
     expect(state?.design.reviewLoopCount).toBe(2);
 
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("design review iteration");
   });
@@ -462,6 +471,8 @@ describe("phase_ready review loop — plan phase", () => {
     expect(persisted.plan.reviewLoopCount).toBe(2);
 
     // Should have sent followUp
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("plan review iteration");
@@ -498,6 +509,8 @@ describe("phase_ready review loop — plan phase", () => {
     // Should have advanced plan → implement and dispatched the ff-implement skill
     const state2 = loadFeatureState("2026-05-20-plan-noloop", null);
     expect(state2?.workflow.currentPhase).toBe("implement");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain('<skill name="ff-implement"');
@@ -527,6 +540,8 @@ describe("phase_ready review loop — plan phase", () => {
     expect((result.content[0] as { text: string }).text).toBe("");
 
     // Should have advanced plan → implement and dispatched the ff-implement skill
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain('<skill name="ff-implement"');
@@ -549,6 +564,8 @@ describe("phase_ready review loop — plan phase", () => {
 
     // Should send plan-review skill as followUp
     expect((result.content[0] as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("ff-plan-review");
@@ -571,6 +588,8 @@ describe("phase_ready review loop — plan phase", () => {
 
     // Should fall through — plan phase, not looping, dispatches ff-implement
     expect((result.content[0] as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain('<skill name="ff-implement"');
@@ -600,6 +619,8 @@ describe("phase_ready review loop — plan phase", () => {
     const state = loadFeatureState("2026-05-20-plan-min", null);
     expect(state?.plan.reviewLoopCount).toBe(2);
 
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("plan review iteration");
   });
@@ -691,6 +712,8 @@ describe("phase_ready review loop — plan phase", () => {
 
     // Should return no-op (not looping), dispatches ff-implement
     expect((result.content[0] as { text: string }).text).toBe("");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain('<skill name="ff-implement"');
@@ -1046,6 +1069,8 @@ describe("phase_ready interceptors — design phase", () => {
     await phaseReady.execute("tc-intercept", {}, undefined, undefined, ctx as unknown as ExtensionContext);
 
     // Should send design-review skill as followUp
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("ff-design-review");
@@ -1192,6 +1217,8 @@ describe("phase_ready interceptors — design phase", () => {
 
     await phaseReady.execute("tc-loopgate", { issuesFound: 3 }, undefined, undefined, NO_UI_CTX);
 
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("ff-design-review");
@@ -1246,6 +1273,8 @@ describe("phase_ready interceptors — design phase", () => {
     await phaseReady.execute("tc-subagent", { issuesFound: 2 }, undefined, undefined, NO_UI_CTX);
 
     // FollowUp should contain subagent dispatch in review method
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("subagent");
@@ -1273,6 +1302,8 @@ describe("phase_ready interceptors — design phase", () => {
     await phaseReady.execute("tc-insession", { issuesFound: 2 }, undefined, undefined, NO_UI_CTX);
 
     // FollowUp should contain expanded design-review skill content (not subagent dispatch)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("ff-design-review");
@@ -1312,6 +1343,8 @@ describe("phase_ready interceptors — plan phase", () => {
     await phaseReady.execute("tc-plan-intercept", {}, undefined, undefined, NO_UI_CTX);
 
     // Should send plan-review skill as followUp
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("ff-plan-review");
@@ -1354,6 +1387,8 @@ describe("phase_ready interceptors — plan phase", () => {
     // Should have fallen through to execution: advanced plan → implement + dispatched ff-implement
     const state = loadFeatureState("2026-05-20-plan-reentry", null);
     expect(state?.workflow.currentPhase).toBe("implement");
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain('<skill name="ff-implement"');
     expect((lastMessage.options as { deliverAs?: string })?.deliverAs).toBe("followUp");
@@ -1378,6 +1413,8 @@ describe("phase_ready interceptors — plan phase", () => {
     await phaseReady.execute("tc-plan-subagent", { issuesFound: 2 }, undefined, undefined, NO_UI_CTX);
 
     // FollowUp should contain plan-reviewer subagent dispatch
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("ff-plan-reviewer");
@@ -1406,6 +1443,8 @@ describe("phase_ready interceptors — plan phase", () => {
     await phaseReady.execute("tc-plan-insession", { issuesFound: 2 }, undefined, undefined, NO_UI_CTX);
 
     // FollowUp should contain inline plan review instructions (not subagent dispatch)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect((lastMessage as { message?: string }).message).toContain("Review the plan against the design");
@@ -1549,7 +1588,18 @@ describe("phase_ready — code review loop deduplication within same turn", () =
     // Only one review history entry should be recorded
     expect(state?.review.reviewHistory).toHaveLength(1);
 
-    // Only one followUp message should have been sent
+    // The followUp is STAGED during the turn (not sent inline), so nothing sent yet.
+    const sentDuringTurn = fake.sentMessages.filter(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
+    ).length;
+    expect(sentDuringTurn).toBe(0);
+
+    // Fire agent_end — exactly one followUp is drained (delivered once).
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUpMessages = fake.sentMessages.filter(
       (m: unknown) =>
         typeof m === "object" &&
@@ -1583,7 +1633,8 @@ describe("phase_ready — code review loop deduplication within same turn", () =
 
     const phaseReady = registeredTools.find((t) => (t as { name: string }).name === "phase_ready") as ToolDefinition;
 
-    // Call 1 (turn 1): processes the review iteration, dispatches ff-review followUp.
+    // Call 1 (turn 1): processes the review iteration, STAGES the ff-review followUp
+    // (delivered at agent_end, not inline). Nothing sent yet.
     await phaseReady.execute("tc-rct-1", { issuesFound: 10 }, undefined, undefined, NO_UI_CTX);
     const followUpsAfter1 = fake.sentMessages.filter(
       (m: unknown) =>
@@ -1591,7 +1642,7 @@ describe("phase_ready — code review loop deduplication within same turn", () =
         m !== null &&
         (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
     ).length;
-    expect(followUpsAfter1).toBe(1);
+    expect(followUpsAfter1).toBe(0);
 
     // Simulate the agent's second LLM response (Thinking between calls).
     await fireAllHandlers(fake.handlers, "turn_end", {}, NO_UI_CTX);
@@ -1606,7 +1657,7 @@ describe("phase_ready — code review loop deduplication within same turn", () =
         m !== null &&
         (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
     ).length;
-    expect(followUpsAfter2).toBe(1); // still one — no second follow-up
+    expect(followUpsAfter2).toBe(0); // still nothing sent inline — no second staging either
 
     // Only one review-loop iteration processed.
     expect(loadFeatureState(slug, null)?.review.reviewHistory ?? []).toHaveLength(1);
@@ -1738,7 +1789,18 @@ describe("phase_ready — design/plan review loop deduplication within same turn
     const state = loadFeatureState(slug, null);
     expect(state?.design.reviewLoopCount).toBe(2); // started at 1, incremented once
 
-    // Only one followUp message should have been sent
+    // The followUp is STAGED during the turn (not sent inline) — drained at agent_end.
+    const sentDuringTurn = fake.sentMessages.filter(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
+    ).length;
+    expect(sentDuringTurn).toBe(0);
+
+    // Fire agent_end — exactly one followUp drained.
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUpMessages = fake.sentMessages.filter(
       (m: unknown) =>
         typeof m === "object" &&
@@ -1776,7 +1838,18 @@ describe("phase_ready — design/plan review loop deduplication within same turn
     const state = loadFeatureState(slug, null);
     expect(state?.plan.reviewLoopCount).toBe(2); // started at 1, incremented once
 
-    // Only one followUp message should have been sent
+    // The followUp is STAGED during the turn (not sent inline) — drained at agent_end.
+    const sentDuringTurn = fake.sentMessages.filter(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
+    ).length;
+    expect(sentDuringTurn).toBe(0);
+
+    // Fire agent_end — exactly one followUp drained.
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     const followUpMessages = fake.sentMessages.filter(
       (m: unknown) =>
         typeof m === "object" &&
@@ -1810,13 +1883,44 @@ describe("phase_ready — design/plan review loop deduplication within same turn
     await phaseReady.execute("tc-design-1b", { issuesFound: 5 }, undefined, undefined, NO_UI_CTX);
     expect(loadFeatureState(slug, null)?.design.reviewLoopCount).toBe(2); // unchanged
 
-    // Fire agent_end — resets the guard (agent turn boundary)
+    // The followUp is STAGED during the turn (not sent inline) — the core fix for
+    // the in-loop-followUp bug: an inline followUp drained inside the same agent
+    // cycle, so turn-2's phase_ready arrived before agent_end reset the guard and
+    // was deduped. Assert nothing was sent yet.
+    const sentBeforeAgentEnd = fake.sentMessages.filter(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
+    ).length;
+    expect(sentBeforeAgentEnd).toBe(0);
+
+    // Fire agent_end — resets the per-cycle guard (the followUp is NOT drained
+    // here anymore; it drains at agent_settled).
     const agentEndHandlers = fake.handlers.get("agent_end");
     expect(agentEndHandlers).toBeDefined();
     expect(agentEndHandlers?.length).toBeGreaterThan(0);
     for (const handler of agentEndHandlers ?? []) {
       await handler({} as ExtensionEvent, NO_UI_CTX);
     }
+    // FollowUp still staged at this point — agent_end no longer drains it.
+    const stagedAfterAgentEnd = fake.sentMessages.filter(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
+    ).length;
+    expect(stagedAfterAgentEnd).toBe(0);
+
+    // Fire agent_settled — pi is idle; the staged followUp is drained (deferred).
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
+    const drainedFollowUps = fake.sentMessages.filter(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
+    ).length;
+    expect(drainedFollowUps).toBe(1); // exactly one followUp drained at the boundary
 
     // First call in turn 2 — should process again (guard was reset)
     await phaseReady.execute("tc-design-2a", { issuesFound: 3 }, undefined, undefined, NO_UI_CTX);
@@ -1867,11 +1971,10 @@ describe("phase_ready — verify transition deduplication within same turn", () 
 
     const phaseReady = registeredTools.find((t) => (t as { name: string }).name === "phase_ready") as ToolDefinition;
 
-    // First call — verify → review, dispatches the review skill followUp.
+    // First call — verify → review, STAGES the review skill followUp (delivered at agent_end).
     const result1 = await phaseReady.execute("tc-verify-dedup-1", {}, undefined, undefined, NO_UI_CTX);
     expect((result1.content[0] as { text: string }).text).toBe("");
-    expect(fake.sentMessages.length).toBe(1);
-    expect(fake.sentMessages[0].options).toEqual({ deliverAs: "followUp" });
+    expect(fake.sentMessages.length).toBe(0); // staged, not yet sent
 
     // Second call the SAME turn — now currentPhase is "review". The review-loop
     // guard was primed by the verify→review transition, so this must be a no-op:
@@ -1882,8 +1985,22 @@ describe("phase_ready — verify transition deduplication within same turn", () 
     // Third call — also a no-op.
     await phaseReady.execute("tc-verify-dedup-3", { issuesFound: 5 }, undefined, undefined, NO_UI_CTX);
 
-    // Still exactly ONE followUp (the review skill dispatch) — no second transition.
-    expect(fake.sentMessages.length).toBe(1);
+    // Still nothing sent inline (no second transition, no second staging).
+    expect(fake.sentMessages.length).toBe(0);
+
+    // Fire agent_end — exactly ONE followUp drained (the review skill dispatch).
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
+    const followUps = fake.sentMessages.filter(
+      (m: unknown) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m as { options?: { deliverAs?: string } }).options?.deliverAs === "followUp",
+    );
+    expect(followUps.length).toBe(1);
+    expect(followUps[0] && (followUps[0] as { options?: { deliverAs?: string } }).options).toEqual({
+      deliverAs: "followUp",
+    });
 
     // No review-loop iteration was recorded (the review branch was blocked).
     const state = loadFeatureState(slug, null);
@@ -1918,9 +2035,9 @@ describe("phase_ready — verify transition deduplication within same turn", () 
 
     const phaseReady = registeredTools.find((t) => (t as { name: string }).name === "phase_ready") as ToolDefinition;
 
-    // Call 1 (turn 1): verify → review, dispatches the review skill followUp.
+    // Call 1 (turn 1): verify → review, STAGES the review skill followUp (not sent inline).
     await phaseReady.execute("tc-vct-1", {}, undefined, undefined, NO_UI_CTX);
-    expect(fake.sentMessages.length).toBe(1);
+    expect(fake.sentMessages.length).toBe(0);
 
     // Simulate the agent's second LLM response (Thinking between calls): fire
     // turn_end + turn_start. With the OLD turn_end-scoped guard this reset the
@@ -1931,8 +2048,8 @@ describe("phase_ready — verify transition deduplication within same turn", () 
     // Call 2 (turn 2, SAME agent turn — now in the review phase): must be a no-op.
     await phaseReady.execute("tc-vct-2", { issuesFound: 10 }, undefined, undefined, NO_UI_CTX);
 
-    // Still exactly ONE followUp — turn_end did NOT reset the guard.
-    expect(fake.sentMessages.length).toBe(1);
+    // Still nothing sent inline — turn_end did NOT reset the guard, no second staging.
+    expect(fake.sentMessages.length).toBe(0);
     const state = loadFeatureState(slug, null);
     expect(state?.review.reviewHistory ?? []).toHaveLength(0);
   });
@@ -1959,10 +2076,10 @@ describe("phase_ready — verify transition deduplication within same turn", () 
     const phaseReady = registeredTools.find((t) => (t as { name: string }).name === "phase_ready") as ToolDefinition;
 
     // Turn 1: verify → review (primes the review guard), then a stray review
-    // call that must be a no-op.
+    // call that must be a no-op. The review-skill followUp is STAGED (not sent inline).
     await phaseReady.execute("tc-vtr-1a", {}, undefined, undefined, NO_UI_CTX);
     await phaseReady.execute("tc-vtr-1b", { issuesFound: 5 }, undefined, undefined, NO_UI_CTX);
-    expect(fake.sentMessages.length).toBe(1); // only the review-skill dispatch
+    expect(fake.sentMessages.length).toBe(0); // staged, not yet sent
 
     // Fire agent_end — resets the once-per-agent-turn guard (agent turn boundary).
     const agentEndHandlers = fake.handlers.get("agent_end");

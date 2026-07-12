@@ -24,6 +24,7 @@ import {
   saveFeatureState,
   syncAndSaveFeatureState,
 } from "../state/feature-state.js";
+import { schedulePostTurnFollowUp } from "../state/post-turn-dispatch.js";
 import { persistState } from "../state/state-persistence.js";
 import { notifyFeatureCompleted } from "../state/worth-notes.js";
 import { NO_FEATURE_STATE, updateWidget } from "../ui/feature-flow-widget.js";
@@ -101,9 +102,7 @@ export async function transitionToFinishPhase(
   }
   persistState(pi, handler);
   updateWidget(handler, NO_FEATURE_STATE);
-  pi.sendUserMessage(expandSkillCommand("/skill:ff-finish", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME), {
-    deliverAs: "followUp",
-  });
+  schedulePostTurnFollowUp(expandSkillCommand("/skill:ff-finish", NO_FEATURE_STATE_OVERRIDE, NO_AGENT_NAME));
 }
 
 /** Dependencies for completeFeature. */

@@ -9,6 +9,7 @@ import { setGuardrailsRef } from "../../src/shared/workflow-refs.js";
 import type { IGuardrails } from "../../src/shared/workflow-types.js";
 import type { FeatureSession } from "../../src/state/feature-session.js";
 import type { FeatureState } from "../../src/state/feature-state.js";
+import { schedulePostTurnDrain } from "../../src/state/post-turn-dispatch.js";
 import { setSetting, setTestSettings } from "../helpers/settings-test-helpers.js";
 import {
   captureTaskReadyAdvanceTool,
@@ -197,13 +198,18 @@ describe("task_ready_advance tool (transitions)", () => {
     featureState.implement.taskReviewRounds["1-only-task"] = 0;
     const g = mockGuardrails();
     setGuardrailsRef(g.ref);
-    const { getTool, sent } = captureTaskReadyAdvanceTool();
+    const { getTool, sent, pi } = captureTaskReadyAdvanceTool();
     const result = await getTool()?.execute("id", {}, undefined, undefined, makeCtx(NOOP));
     // last→verify runs the machinery + dispatches ff-verify (interTaskCompact=none → fallback fires)
     expect(completed).toHaveLength(1);
     expect(g.wasSetTo()).toBe(false);
     expect(featureState.implement.currentTask).toBeNull(); // reset on exit
     expect((result?.content?.[0] as { text: string } | undefined)?.text ?? "").toMatch(/advancing to the next phase/i);
+    // ff-verify is staged for agent_settled delivery — schedule the deferred drain and flush the timer.
+    vi.useFakeTimers();
+    schedulePostTurnDrain(pi);
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
     expect(sent.some((s) => s.text.includes("ff-verify"))).toBe(true);
   });
 
@@ -304,8 +310,13 @@ describe("task_ready_advance edge cases + last→verify coverage", () => {
     const { featureState } = installHandler("1. Only task");
     featureState.implement.taskReviewRounds["1-only-task"] = 0;
     setGuardrailsRef(mockGuardrails().ref);
-    const { getTool, sent } = captureTaskReadyAdvanceTool();
+    const { getTool, sent, pi } = captureTaskReadyAdvanceTool();
     await getTool()?.execute("id", {}, undefined, undefined, makeCtx(NOOP)); // interTaskCompact=none → fallback
+    // ff-verify is staged for agent_settled delivery — schedule the deferred drain and flush the timer.
+    vi.useFakeTimers();
+    schedulePostTurnDrain(pi);
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
     const verify = sent.find((s) => s.text.includes("ff-verify"));
     if (!verify) throw new Error("expected an ff-verify dispatch");
     expect(verify.options.deliverAs).toBe("followUp");

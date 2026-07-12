@@ -175,4 +175,6 @@ export interface IAgentLifecycle {
     event: { messages?: ReadonlyArray<{ role: string; stopReason?: string; errorMessage?: string }> },
     ctx: ExtensionContext,
   ): Promise<void>;
+  /** agent_settled handler body — pi will not continue automatically. */
+  onAgentSettled(): Promise<void>;
 }

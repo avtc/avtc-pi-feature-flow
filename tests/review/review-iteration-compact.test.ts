@@ -35,6 +35,7 @@ import {
   NO_AUTO_AGENT_CALLBACK,
   NO_UI_CTX,
   PLAN_ACTIVE_STATE,
+  settleAndDrainPostTurnFollowUp,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
 
@@ -90,6 +91,8 @@ describe("review iteration compact — design shouldLoop=true", () => {
     expect(compactCalls.length).toBe(0);
 
     // Skill should have been sent directly
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("design review iteration");
@@ -508,6 +511,8 @@ describe("review iteration compact — threshold behavior", () => {
     expect(compactCalls.length).toBe(0);
 
     // Skill should have been sent directly
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("design review iteration");
@@ -769,6 +774,8 @@ describe("review iteration compact — edge cases", () => {
     expect(selectFn).toHaveBeenCalled();
 
     // Writing-plans sent directly (not via onComplete)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("ff-plan");
@@ -838,6 +845,8 @@ describe("review iteration compact — edge cases", () => {
     expect(compactCalls.length).toBe(0);
 
     // Skill sent directly
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("design review iteration");
@@ -873,6 +882,8 @@ describe("review iteration compact — edge cases", () => {
     expect(compactCalls.length).toBe(0);
 
     // Skill sent directly
+    await fireAllHandlers(fake.handlers, "agent_end", {}, NO_UI_CTX);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThan(0);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain("design review iteration");

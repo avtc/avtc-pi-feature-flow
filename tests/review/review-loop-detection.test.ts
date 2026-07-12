@@ -14,6 +14,7 @@ import {
   createPiWithToolCapture,
   fireAllHandlers,
   getToolHandlers,
+  settleAndDrainPostTurnFollowUp,
   writeFeatureStateFile,
 } from "../helpers/workflow-monitor-test-helpers.js";
 
@@ -187,6 +188,8 @@ describe("review loop detection", () => {
     );
 
     // Should have re-dispatched the review skill despite non-prefixed task names
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.options).toEqual({ deliverAs: "followUp" });
@@ -222,6 +225,8 @@ describe("review loop detection", () => {
     );
 
     // Should re-dispatch the review skill as followUp
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.options).toEqual({ deliverAs: "followUp" });
@@ -505,6 +510,8 @@ describe("review loop detection", () => {
     );
 
     // Should re-dispatch review skill (minReviewLoops not met)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.options).toEqual({ deliverAs: "followUp" });
@@ -613,6 +620,8 @@ describe("review loop detection", () => {
     );
 
     // Should re-dispatch ff-review
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain('<skill name="ff-review"');
@@ -691,6 +700,8 @@ describe("review loop detection", () => {
     );
 
     // Should have re-dispatched (1 real issue, loop cap 3 not reached)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain('<skill name="ff-review"');
@@ -791,6 +802,8 @@ describe("minReviewLoops integration", () => {
     );
 
     // minReviewLoops=2, currentLoop=0, minMet=false → should loop even with 0 real issues
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain('<skill name="ff-review"');
@@ -939,6 +952,8 @@ describe("minReviewLoops integration", () => {
 
     // currentLoop=1, numericMin=3, minMet = (1+1) >= 3 = false → !minMet=true
     // issuesFound=0, !minMet=true → (0 || true) = true → shouldLoop = true
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain('<skill name="ff-review"');
@@ -976,6 +991,8 @@ describe("minReviewLoops integration", () => {
     // currentLoop=0, numericMin=3, minMet=false → !minMet=true
     // effectiveMax = max(1,3) = 3, currentLoop+1 = 1 < 3 → true
     // shouldLoop = true (even though maxFeatureReviewRounds=1, min raises ceiling)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain('<skill name="ff-review"');
@@ -1154,6 +1171,8 @@ describe("minReviewLoops integration", () => {
     );
 
     // Should have re-dispatched review (2 actionable issues from tasks without result)
+    await fireAllHandlers(fake.handlers, "agent_end", {}, ctx as unknown as ExtensionContext);
+    await settleAndDrainPostTurnFollowUp(fake.handlers);
     expect(fake.sentMessages.length).toBeGreaterThanOrEqual(1);
     const lastMessage = fake.sentMessages[fake.sentMessages.length - 1];
     expect(lastMessage.message).toContain('<skill name="ff-review"');

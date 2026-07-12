@@ -41,7 +41,7 @@ interface SqlDatabase {
  */
 const _origEmit = process.emit;
 // Node's overloaded emit signature isn't directly assignable — loose cast is intentional.
-(process as { emit: typeof process.emit }).emit = function (event: string, ...args: unknown[]): boolean {
+(process as { emit: typeof process.emit }).emit = (event: string, ...args: unknown[]): boolean => {
   if (
     event === "warning" &&
     args[0] &&
