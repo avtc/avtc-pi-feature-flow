@@ -179,11 +179,15 @@ The `/ff:settings` command opens a tabbed modal covering every setting — workf
 
 Workflow settings (workflow behavior, review-loop counts, branch policy, feature review mode, inter-task context compaction) live in `avtc-pi-feature-flow-settings.json` (`~/.pi/agent/` global, `<cwd>/.pi/` project overrides) and are edited via `/ff:settings`. **Model routing per phase** is configured separately in pi's shared `~/.pi/agent/settings.json` under the `"avtc-pi-feature-flow"` key. See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) for the full reference.
 
+## Full suite
+
+Check out the full suite of related extensions, [avtc-pi](https://github.com/avtc/avtc-pi) — deterministic feature development, subagent delegation, working-memory, behavioral learning, parallel-work guardrails, durable decisions, notifications, and more.
+
+Developed with [Z.ai](https://z.ai/subscribe?ic=N5IV4LLOOV) — get 10% off your subscription via this referral link.
+
 ## Attribution
 
 Inspired by [coctostan/pi-superpowers-plus](https://github.com/coctostan/pi-superpowers-plus) and [obra/superpowers](https://github.com/obra/superpowers) (Jesse Vincent).
-
-> Developed with [Z.ai](https://z.ai/subscribe?ic=N5IV4LLOOV) — get 10% off your subscription via this referral link.
 
 ## License
 

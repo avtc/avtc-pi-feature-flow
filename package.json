@@ -1,6 +1,6 @@
 {
   "name": "avtc-pi-feature-flow",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Predictable, deterministic feature development for pi — deep upfront design, configurable comprehensive review and verification rigor, and auto-agents draining a backlog",
   "type": "module",
   "keywords": [
@@ -17,8 +17,7 @@
     "test": "node scripts/test-low-priority.cjs \"node scripts/run-parallel.cjs \"npm run lint:optional-params :: npm run lint:bare-literals :: npm run lint:design-refs :: npm run lint:as-never :: npm run lint:bundled-imports :: npm run lint :: npm run typecheck :: npm run knip :: npm run dupes\" && vitest run\"",
     "dupes": "jscpd src/ skills/ --exit-code --threshold 0.01",
     "lint:as-never": "node scripts/no-as-never.cjs src/ tests/ index.ts",
-    "lint:bundled-imports": "node scripts/no-bundled-extension-imports.cjs src/ index.ts",
-    "prepublishOnly": "node scripts/check-symlinks.mjs"
+    "lint:bundled-imports": "node scripts/no-bundled-extension-imports.cjs src/ index.ts"
   },
   "license": "MIT",
   "author": "avtc <tarasenkov@gmail.com>",
@@ -40,12 +39,12 @@
   "pi": {
     "extensions": [
       "./index.ts",
-      "node_modules/avtc-pi-subagent/index.ts",
-      "node_modules/avtc-pi-todo/index.ts",
-      "node_modules/avtc-pi-parallel-work-guardrail/index.ts",
-      "node_modules/avtc-pi-ui-components/index.ts",
-      "node_modules/avtc-pi-subagent-ui-bridge/index.ts",
-      "node_modules/avtc-pi-unstuck/index.ts"
+      "../avtc-pi-subagent/index.ts",
+      "../avtc-pi-todo/index.ts",
+      "../avtc-pi-parallel-work-guardrail/index.ts",
+      "../avtc-pi-ui-components/index.ts",
+      "../avtc-pi-subagent-ui-bridge/index.ts",
+      "../avtc-pi-unstuck/index.ts"
     ],
     "allowedCodeDeps": [
       "avtc-pi-logger",
@@ -82,13 +81,5 @@
   "bugs": {
     "url": "https://github.com/avtc/avtc-pi-feature-flow/issues"
   },
-  "homepage": "https://github.com/avtc/avtc-pi-feature-flow",
-  "bundledDependencies": [
-    "avtc-pi-subagent",
-    "avtc-pi-todo",
-    "avtc-pi-parallel-work-guardrail",
-    "avtc-pi-ui-components",
-    "avtc-pi-subagent-ui-bridge",
-    "avtc-pi-unstuck"
-  ]
+  "homepage": "https://github.com/avtc/avtc-pi-feature-flow"
 }
