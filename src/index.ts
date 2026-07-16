@@ -13,6 +13,7 @@
 import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { registerUatCommands } from "./commands/auto-agent-commands.js";
+import { registerCompactCommands } from "./commands/compact-commands.js";
 import { registerWorkflowCommands } from "./commands/workflow-commands.js";
 import { createCompaction } from "./compaction/compact-handler.js";
 import { registerAllEvents } from "./events/index.js";
@@ -72,7 +73,6 @@ const WIRED_KEY = "__avtcPiFeatyardWired";
 type GlobalWithWired = typeof globalThis & { [WIRED_KEY]?: boolean };
 
 export { stripFrontmatter } from "@earendil-works/pi-coding-agent";
-export { safeSetEditorText } from "./compaction/safe-editor-write.js";
 export { resolveBaseBranch as _resolveBaseBranch } from "./git/resolve-base-branch.js";
 export {
   bashSingleQuote,
@@ -578,6 +578,9 @@ async function initWorkflowMonitor(pi: ExtensionAPI, _deps: { todoApi: ReturnTyp
     getExpectedSkill,
     getAutoAgentCallback,
   });
+
+  // Compact commands (/fy:continue — resume after a compaction that did not auto-inject)
+  registerCompactCommands(pi);
 
   // --- Kanban extension (absorbed from standalone) ---
   // Registers /fy:auto-agent, /fy:auto-worker, /fy:auto-designer, /fy:auto-pause,

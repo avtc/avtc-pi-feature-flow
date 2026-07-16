@@ -24,7 +24,7 @@ import type { FeatureSession } from "../state/feature-session.js";
 import type { ExpandSkillCommandFn } from "../state/feature-state.js";
 import { clearPostTurnFollowUp, hasPostTurnFollowUp } from "../state/post-turn-dispatch.js";
 import { buildCompactFraming, buildCompactSkillBlock } from "./compact-message.js";
-import { safeSetEditorText } from "./safe-editor-write.js";
+import { stageContinueFollowUp } from "./continue-followup.js";
 
 // phase→skill map to phase-progression.ts — review/uat phases handled dynamically in getExpectedSkill()
 export interface CompactionDeps {
@@ -303,23 +303,28 @@ export function createCompaction(pi: ExtensionAPI, deps: CompactionDeps): ICompa
     if (inProgressItem) parts.push(inProgressItem);
     const message = parts.join("\n\n");
 
-    // --- Route to editor (no auto-inject) vs. inject followUp (auto-resume). ---
-    // Editor when the user is genuinely in control: a user-initiated manual compact, OR the
-    // agent just finished its turn (human's turn) AND no phase-transition followUp was staged
-    // (a staged followUp means the workflow is actively advancing — compaction must inject to
-    // continue it, not park a hint in the editor). Inject otherwise (auto/extension
-    // compaction while the agent is mid-turn, plus the pi-auto-compaction-supersedes case).
+    // --- Stage for /fy:continue (no auto-inject) vs. inject followUp (auto-resume). ---
+    // Stage when the user is in control: a user-initiated manual compact, OR the agent just
+    // finished its turn (human's turn) AND no phase-transition followUp was staged (a staged
+    // followUp means the workflow is actively advancing — compaction must inject to continue it).
+    // Inject otherwise (auto/extension compaction while the agent is mid-turn, plus the
+    // pi-auto-compaction-supersedes case). Staging parks the message for /fy:continue instead of
+    // auto-injecting, so a user who compacted manually (or whose turn just ended) stays in
+    // control and resumes explicitly — no surprise editor paste, no blocking agent turn.
     // No fallback skill: when there's no mapped skill (workflow inactive / no caller skillName),
-    // nothing skill-related is injected, and no editor hint is shown (the notify IS the hint —
-    // if there's no skill, there's nothing valuable to surface).
-    const notifyMsg = skillName
-      ? `Editor has content — compaction follow-up not injected. Run /skill:${skillName} to continue.`
-      : null;
-    const routeToEditor = isUserInitiatedManual || (agentJustFinishedRef.value && !hadStagedPostTurnFollowUp);
-    if (routeToEditor) {
-      const route = isUserInitiatedManual ? "user-initiated manual" : "turn-end";
-      log.info(`Routing compaction followUp to editor (${route}) — skill: ${skillName ?? "none"}, phase: ${phase}`);
-      safeSetEditorText(message, notifyMsg);
+    // there is nothing valuable to stage — skip (the user compacted outside a workflow).
+    const routeToContinue = isUserInitiatedManual || (agentJustFinishedRef.value && !hadStagedPostTurnFollowUp);
+    if (routeToContinue) {
+      if (!skillName) {
+        const route = isUserInitiatedManual ? "user-initiated manual" : "turn-end";
+        log.info(`Compaction followUp has no skill — skipping /fy:continue stage (${route}), phase: ${phase}`);
+      } else {
+        const route = isUserInitiatedManual ? "user-initiated manual" : "turn-end";
+        log.info(`Staging compaction followUp for /fy:continue (${route}) — skill: ${skillName}, phase: ${phase}`);
+        stageContinueFollowUp(message);
+        const ui = globalThis.__piCtx?.ui;
+        ui?.notify?.("Context compacted. Run /fy:continue <your message, optional> to resume", "info");
+      }
     } else {
       log.info(
         `Injecting compaction followUp (deferred ${DEFERRED_FOLLOWUP_MS}ms) — skill: ${skillName ?? "none"}, phase: ${phase}, superseded=${hadStagedPostTurnFollowUp}`,

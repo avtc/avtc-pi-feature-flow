@@ -137,6 +137,7 @@ A queued backlog plus `/fy:auto-agent` lets the harness chew through features on
 | `/fy:reset` | Turn-off the workflow |
 | `/fy:resume` | List active workflows and load the selected one into the current session |
 | `/fy:settings` | Open the settings UI |
+| `/fy:continue [note]` | Resume the workflow after a context compaction that waited for you to continue (manual `/compact`, or an automatic compaction at turn end). The prompt to run it appears as a notify. Optionally append a note that is sent with the resumed message |
 | `/fy:archive-artifacts <days>` | Archive old workflow artifacts (older than `<days>` days) out of your way; asks before moving anything |
 | `/fy:archive-designs <days>` | Archive old design docs (older than `<days>` days) from both `.featyard/designs` and `docs/featyard/designs`; asks before moving anything |
 

@@ -11,6 +11,11 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { DEFERRED_COMPACT_FOLLOWUP_MS } from "../../src/compaction/compact-handler.js";
+import {
+  _resetContinueFollowUp,
+  consumeContinueFollowUp,
+  hasContinueFollowUp,
+} from "../../src/compaction/continue-followup.js";
 import workflowMonitorExtension, { _getExpectedSkill, _resetFeatureState } from "../../src/index.js";
 import {
   clearPostTurnFollowUp,
@@ -35,6 +40,7 @@ describe("session_compact skill injection", () => {
     vi.useFakeTimers();
     withTempCwd();
     _resetFeatureState();
+    _resetContinueFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
     enableSubagentMode();
@@ -44,6 +50,7 @@ describe("session_compact skill injection", () => {
     delete globalThis.__piCtx;
     vi.useRealTimers();
     _resetFeatureState();
+    _resetContinueFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
   });
@@ -345,7 +352,7 @@ describe("session_compact skill injection", () => {
     const onAgentEnd = getSingleHandler(fake.handlers, "agent_end");
     await onAgentEnd({} as unknown as ExtensionEvent, { hasUI: false } as unknown as ExtensionContext);
 
-    // Now compact — should NOT inject because it's the human's turn
+    // Now compact — should NOT inject because it's the human's turn; instead it stages for /fy:continue
     const onCompact = getSingleHandler(fake.handlers, "session_compact");
     await onCompact(
       {
@@ -356,6 +363,8 @@ describe("session_compact skill injection", () => {
     );
 
     expect(sendUserMessageCalls.length).toBe(0);
+    // Staged for /fy:continue (not injected, not editor-pasted).
+    expect(hasContinueFollowUp()).toBe(true);
   });
 
   test("injects after compaction when agent_start reset the flag (LLM's turn)", async () => {
@@ -478,6 +487,7 @@ describe("session_compact review skill injection", () => {
     delete globalThis.__piCtx;
     vi.useFakeTimers();
     _resetFeatureState();
+    _resetContinueFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
   });
@@ -486,6 +496,7 @@ describe("session_compact review skill injection", () => {
     delete globalThis.__piCtx;
     vi.useRealTimers();
     _resetFeatureState();
+    _resetContinueFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
   });
@@ -618,6 +629,7 @@ describe("session_compact iteration skill injection", () => {
     vi.useFakeTimers();
     withTempCwd();
     _resetFeatureState();
+    _resetContinueFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
   });
@@ -626,6 +638,7 @@ describe("session_compact iteration skill injection", () => {
     delete globalThis.__piCtx;
     vi.useRealTimers();
     _resetFeatureState();
+    _resetContinueFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
   });
@@ -874,6 +887,7 @@ describe("session_compact routing by reason (regression: manual user-initiated)"
     vi.useFakeTimers();
     withTempCwd();
     _resetFeatureState();
+    _resetContinueFollowUp();
     clearPostTurnFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
@@ -884,12 +898,13 @@ describe("session_compact routing by reason (regression: manual user-initiated)"
     delete globalThis.__piCtx;
     vi.useRealTimers();
     _resetFeatureState();
+    _resetContinueFollowUp();
     clearPostTurnFollowUp();
     delete process.env.PI_SUBAGENT_CHILD_AGENT;
     delete process.env.PI_FY_FEATURE;
   });
 
-  test("user-initiated manual compact (reason=manual, no triggers) routes to editor, NOT sendUserMessage", async () => {
+  test("user-initiated manual compact (reason=manual, no triggers) stages for /fy:continue, NOT sendUserMessage", async () => {
     const slug = "test-manual-compact";
     process.env.PI_FY_FEATURE = slug;
 
@@ -939,9 +954,10 @@ describe("session_compact routing by reason (regression: manual user-initiated)"
 
     // Must NOT auto-inject (would start a blocking turn that hangs the user's steer)
     expect(sendUserMessageCalls.length).toBe(0);
-    // Routes the content to the editor instead (user is in control)
-    expect(editorText.length).toBe(1);
-    expect(editorText[0]).toMatch(/^<skill name="fy-implement"/);
+    // Stages for /fy:continue instead of routing to the editor (user is in control)
+    expect(editorText.length).toBe(0);
+    expect(hasContinueFollowUp()).toBe(true);
+    expect(consumeContinueFollowUp()).toMatch(/^<skill name="fy-implement"/);
   });
 
   test("extension-triggered compact (reason=manual + storedFollowUp) still injects via sendUserMessage", async () => {
